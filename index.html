@@ -108,7 +108,15 @@
                 <select id="epd-palette" onchange="drawImageWithAdjustments()">
                 </select>
             </label>
+
+            <label>Metoda ditheringu:
+                <select id="ditheringMethod" onchange="drawImageWithAdjustments()">
+                    <option value="none">Žádná</option>
+                    <option value="floyd-steinberg">Floyd-Steinberg</option>
+                </select>
+            </label>
         </div>
+
 
         <div id="sliders" style="display:none;">
             <div class="slider-label">
@@ -173,10 +181,10 @@
 
     <script>
         const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
         const epdCanvas = document.getElementById('epd-canvas');
-        const epdCtx = epdCanvas.getContext('2d');
+        const epdCtx = epdCanvas.getContext('2d', { willReadFrequently: true });
 
         const epdSimCanvas = document.getElementById('epd-sim-canvas');
         const epdSimCtx = epdSimCanvas.getContext('2d');
@@ -222,6 +230,10 @@
             outputHeight = parseInt(document.getElementById('outputHeight').value);
             canvas.width = outputWidth;
             canvas.height = outputHeight;
+            epdCanvas.width = outputWidth;
+            epdCanvas.height = outputHeight;
+            epdSimCanvas.width = outputWidth;
+            epdSimCanvas.height = outputHeight;
             drawImageWithAdjustments();
         }
 
@@ -278,47 +290,127 @@
             });
         }
 
-        function quantizeImage(imageData, colorPalette) {
+        function findExactColor(rgb, colorPalette) {
+            let closestColor = colorPalette[0];
+
+            colorPalette.forEach(color => {
+                if (color.original[0] === rgb[0] && color.original[1] === rgb[1] && color.original[2] === rgb[2]) {
+                    closestColor = color;
+                    return;
+                }
+            });
+
+            return closestColor;
+        }
+
+        function findClosestColor(rgb, colorPalette) {
+            let closestColor = colorPalette[0];
+            let minDistance = Infinity;
+
+            colorPalette.forEach(color => {
+                const distance = Math.sqrt(
+                    Math.pow(rgb[0] - color.original[0], 2) +
+                    Math.pow(rgb[1] - color.original[1], 2) +
+                    Math.pow(rgb[2] - color.original[2], 2)
+                );
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestColor = color;
+                }
+            });
+
+            return closestColor;
+        }
+
+
+        function simplePosterization(imageData, colorPalette) {
             const data = imageData.data;
 
+            for (let i = 0; i < data.length; i += 4) {
+                let color = findClosestColor(data.slice(i, i + 3), colorPalette);
+
+                // Set the pixel color to the corresponding display color
+                data[i] = color.original[0];  // red
+                data[i + 1] = color.original[1];  // green
+                data[i + 2] = color.original[2];  // blue
+            }
+
+            return imageData;
+        }
+
+        function floydSteinbergDithering(imageData, colorPalette) {
+            const data = imageData.data;
+            const width = imageData.width;
+            const height = imageData.height;
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const index = (y * width + x) * 4; // Get the pixel index
+                    const r = data[index];     // Red
+                    const g = data[index + 1]; // Green
+                    const b = data[index + 2]; // Blue
+
+                    // Find the closest color in the palette
+                    const closestColor = findClosestColor([r, g, b], colorPalette);
+                    const newColor = closestColor.original;
+
+                    // Set the new color
+                    data[index] = newColor[0];
+                    data[index + 1] = newColor[1];
+                    data[index + 2] = newColor[2];
+
+                    // Calculate the error
+                    const errR = r - newColor[0];
+                    const errG = g - newColor[1];
+                    const errB = b - newColor[2];
+
+                    // Distribute the error to neighboring pixels
+                    if (x + 1 < width) {
+                        data[index + 4] += errR * 7 / 16; // Right
+                        data[index + 5] += errG * 7 / 16;
+                        data[index + 6] += errB * 7 / 16;
+                    }
+                    if (y + 1 < height) {
+                        if (x > 0) {
+                            data[index + width * 4 - 4] += errR * 3 / 16; // Bottom left
+                            data[index + width * 4 - 3] += errG * 3 / 16;
+                            data[index + width * 4 - 2] += errB * 3 / 16;
+                        }
+                        data[index + width * 4] += errR * 5 / 16; // Bottom
+                        data[index + width * 4 + 1] += errG * 5 / 16;
+                        data[index + width * 4 + 2] += errB * 5 / 16;
+                        if (x + 1 < width) {
+                            data[index + width * 4 + 4] += errR * 1 / 16; // Bottom right
+                            data[index + width * 4 + 5] += errG * 1 / 16;
+                            data[index + width * 4 + 6] += errB * 1 / 16;
+                        }
+                    }
+                }
+            }
+
+            return imageData;
+        }
+
+
+        function simulatedImage(imageData, colorPalette) {
+            const data = imageData.data;
             const imageSimData = new ImageData(imageData.width, imageData.height);
             imageSimData.data.set(data);
             const data_sim = imageSimData.data;
 
-            const numColors = colorPalette.length;
-
             for (let i = 0; i < data.length; i += 4) {
-                let closestColor = colorPalette[0];
-                let minDistance = Infinity;
-
-                for (let j = 0; j < numColors; j++) {
-                    const paletteColor = colorPalette[j].original;
-
-                    // Calculate Euclidean distance
-                    const distance = Math.sqrt(
-                        Math.pow(data[i] - paletteColor[0], 2) +
-                        Math.pow(data[i + 1] - paletteColor[1], 2) +
-                        Math.pow(data[i + 2] - paletteColor[2], 2)
-                    );
-
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        closestColor = colorPalette[j];
-                    }
-                }
+                let color = findExactColor(data.slice(i, i + 3), colorPalette);
 
                 // Set the pixel color to the corresponding display color
-                data[i] = closestColor.original[0];  // red
-                data[i + 1] = closestColor.original[1];  // green
-                data[i + 2] = closestColor.original[2];  // blue
-
-                data_sim[i] = closestColor.sim[0];  // red
-                data_sim[i + 1] = closestColor.sim[1];  // green
-                data_sim[i + 2] = closestColor.sim[2];  // blue
+                data_sim[i] = color.sim[0];  // red
+                data_sim[i + 1] = color.sim[1];  // green
+                data_sim[i + 2] = color.sim[2];  // blue
             }
 
-            return [imageData, imageSimData];
+            return imageSimData;
         }
+
 
         function drawImageWithAdjustments() {
             if (!originalImage) return;
@@ -327,6 +419,7 @@
             const contrast = parseFloat(document.getElementById('contrast').value);
             const saturation = parseFloat(document.getElementById('saturation').value);
             const gamma = parseFloat(document.getElementById('gamma').value);
+            const ditheringMethod = document.getElementById('ditheringMethod').value;
             const crop = document.getElementById('cropImage').checked;
 
             ctx.fillStyle = borderColor;
@@ -380,10 +473,18 @@
             // epdCtx.clearRect(0, 0, epdCanvas.width, epdCanvas.height);
             const select = document.getElementById('epd-palette');
             const selectedPaletteCode = select.options[select.selectedIndex].value;
-            const quantizedDataArray = quantizeImage(finalImageData, colorPalettes[selectedPaletteCode]);
 
-            epdCtx.putImageData(quantizedDataArray[0], 0, 0);
-            epdSimCtx.putImageData(quantizedDataArray[1], 0, 0);
+            let palettedImage;
+            if (ditheringMethod === "floyd-steinberg") {
+                palettedImage = floydSteinbergDithering(finalImageData, colorPalettes[selectedPaletteCode]);
+            } else {
+                // No dithering
+                palettedImage = simplePosterization(finalImageData, colorPalettes[selectedPaletteCode]);
+            }
+
+            epdCtx.putImageData(palettedImage, 0, 0);
+
+            epdSimCtx.putImageData(simulatedImage(palettedImage, colorPalettes[selectedPaletteCode]), 0, 0);
         }
 
         function downloadImage() {
