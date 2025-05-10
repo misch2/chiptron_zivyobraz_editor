@@ -112,7 +112,7 @@
             <label>Metoda ditheringu:
                 <select id="ditheringMethod" onchange="drawImageWithAdjustments()">
                     <option value="none">Žádná</option>
-                    <option value="floyd-steinberg">Floyd-Steinberg</option>
+                    <option value="floyd-steinberg" selected>Floyd-Steinberg</option>
                 </select>
             </label>
         </div>
@@ -258,26 +258,35 @@
         }
 
         const colorPalettes = {
-            "BW (černobílý)": [
+            "2 - BW (černobílý)": [
                 { original: [0, 0, 0], sim: [0, 0, 0] }, // Black
                 { original: [255, 255, 255], sim: [230, 230, 230] } // White
             ],
-            "BWR (černo-bílo-červený)": [
+            "3 - BWR (černo-bílo-červený)": [
                 { original: [0, 0, 0], sim: [10, 10, 10] },  // Black
                 { original: [255, 255, 255], sim: [230, 230, 230] }, // White
                 { original: [255, 0, 0], sim: [190, 30, 30] }  // Red
             ],
-            "BWY (černo-bílo-žlutý)": [
+            "3 - BWY (černo-bílo-žlutý)": [
                 { original: [0, 0, 0], sim: [10, 10, 10] },  // Black
                 { original: [255, 255, 255], sim: [230, 230, 230] }, // White
                 { original: [255, 255, 0], sim: [230, 200, 30] } // Yellow
             ],
-            "BWRY (černo-bílo-červený-žlutý)": [
+            "4 - BWRY (černo-bílo-červeno-žlutý)": [
                 { original: [0, 0, 0], sim: [10, 10, 10] },  // Black
                 { original: [255, 255, 255], sim: [230, 230, 230] }, // White
                 { original: [255, 0, 0], sim: [190, 30, 30] },  // Red
                 { original: [255, 255, 0], sim: [230, 200, 30] } // Yellow
             ],
+            "7 - BWRYGBO (černo-bílo-červeno-žluto-zeleno-modro-oranžový)": [
+                { original: [0, 0, 0], sim: [10, 10, 10] },  // Black
+                { original: [255, 255, 255], sim: [230, 230, 230] }, // White
+                { original: [255, 0, 0], sim: [190, 30, 30] },  // Red
+                { original: [255, 255, 0], sim: [230, 200, 30] }, // Yellow
+                { original: [0, 255, 0], sim: [30, 190, 30] }, // Green
+                { original: [0, 0, 255], sim: [30, 30, 190] }, // Blue
+                { original: [255, 165, 0], sim: [230, 130, 30] } // Orange
+            ]
         }
 
         function generateColorPaletteSelection() {
