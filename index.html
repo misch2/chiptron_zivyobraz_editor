@@ -81,6 +81,11 @@
             min-width: 40px;
             text-align: right;
         }
+
+        #epd-sim-controls {
+            margin-top: 1em;
+            margin-bottom: 1em;
+        }
     </style>
 </head>
 
@@ -96,6 +101,13 @@
             <label>Výstupní šířka: <input type="number" id="outputWidth" value="800" min="1"></label>
             <label>Výstupní výška: <input type="number" id="outputHeight" value="480" min="1"></label>
             <button onclick="resizeCanvas()"><i class="fas fa-cogs icon"></i>Upravit rozlišení</button>
+        </div>
+
+        <div id="epd-sim-controls">
+            <label>Simulace ePaper - zvolte paletu:
+                <select id="epd-palette" onchange="drawImageWithAdjustments()">
+                </select>
+            </label>
         </div>
 
         <div id="sliders" style="display:none;">
@@ -233,12 +245,38 @@
             }
         }
 
-        const colorPaletteBWR = [
-            // FIXME just a test
-            { original: [0, 0, 0], sim: [10, 10, 10] },  // Black
-            { original: [255, 255, 255], sim: [230, 230, 230] }, // White
-            { original: [255, 0, 0], sim: [190, 30, 30] }  // Red
-        ];
+        const colorPalettes = {
+            "BW (černobílý)": [
+                { original: [0, 0, 0], sim: [0, 0, 0] }, // Black
+                { original: [255, 255, 255], sim: [230, 230, 230] } // White
+            ],
+            "BWR (černo-bílo-červený)": [
+                { original: [0, 0, 0], sim: [10, 10, 10] },  // Black
+                { original: [255, 255, 255], sim: [230, 230, 230] }, // White
+                { original: [255, 0, 0], sim: [190, 30, 30] }  // Red
+            ],
+            "BWY (černo-bílo-žlutý)": [
+                { original: [0, 0, 0], sim: [10, 10, 10] },  // Black
+                { original: [255, 255, 255], sim: [230, 230, 230] }, // White
+                { original: [255, 255, 0], sim: [230, 200, 30] } // Yellow
+            ],
+            "BWRY (černo-bílo-červený-žlutý)": [
+                { original: [0, 0, 0], sim: [10, 10, 10] },  // Black
+                { original: [255, 255, 255], sim: [230, 230, 230] }, // White
+                { original: [255, 0, 0], sim: [190, 30, 30] },  // Red
+                { original: [255, 255, 0], sim: [230, 200, 30] } // Yellow
+            ],
+        }
+
+        function generateColorPaletteSelection() {
+            const select = document.getElementById('epd-palette');
+            Object.keys(colorPalettes).forEach(key => {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = key;
+                select.appendChild(option);
+            });
+        }
 
         function quantizeImage(imageData, colorPalette) {
             const data = imageData.data;
@@ -340,7 +378,9 @@
 
             // Draw the EPD simulation canvas
             // epdCtx.clearRect(0, 0, epdCanvas.width, epdCanvas.height);
-            const quantizedDataArray = quantizeImage(finalImageData, colorPaletteBWR);
+            const select = document.getElementById('epd-palette');
+            const selectedPaletteCode = select.options[select.selectedIndex].value;
+            const quantizedDataArray = quantizeImage(finalImageData, colorPalettes[selectedPaletteCode]);
 
             epdCtx.putImageData(quantizedDataArray[0], 0, 0);
             epdSimCtx.putImageData(quantizedDataArray[1], 0, 0);
@@ -359,6 +399,11 @@
             link.href = epdCanvas.toDataURL();
             link.click();
         }
+
+        window.onload = function () {
+            generateColorPaletteSelection();
+        };
+
     </script>
 </body>
 
