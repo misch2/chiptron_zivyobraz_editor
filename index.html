@@ -117,7 +117,7 @@
             <input type="range" min="0" max="5" step="0.1" value="1" id="saturation">
 
             <div class="slider-label">
-                <label for="gamma">Gamma:</label>
+                <label for="gamma">Gama korekce:</label>
                 <span id="gammaValue">1.0</span>
             </div>
             <input type="range" min="0.1" max="3" step="0.1" value="1" id="gamma">
@@ -148,6 +148,10 @@
 
     <div class="preview-container">
         <canvas id="canvas" width="800" height="480"></canvas>
+    </div>
+
+    <div class="preview-container">
+        <canvas id="epd-sim-canvas" width="800" height="480"></canvas>
     </div>
 
     <script>
@@ -217,6 +221,48 @@
             }
         }
 
+        const colorPaletteBWR = [
+            // FIXME just a test
+            { original: [0, 0, 0], display: [10, 10, 10] },  // Black
+            { original: [255, 255, 255], display: [230, 230, 230] }, // White
+            { original: [255, 0, 0], display: [190, 30, 30] }  // Red
+        ];
+
+        function quantizeImage(imageData, colorPalette) {
+            const data = imageData.data;
+            const numColors = colorPalette.length;
+
+            for (let i = 0; i < data.length; i += 4) {
+                let closestColor = colorPalette[0];
+                let minDistance = Infinity;
+
+                for (let j = 0; j < numColors; j++) {
+                    const paletteColor = colorPalette[j].original;
+
+                    // Calculate Euclidean distance
+                    const distance = Math.sqrt(
+                        Math.pow(data[i] - paletteColor[0], 2) +
+                        Math.pow(data[i + 1] - paletteColor[1], 2) +
+                        Math.pow(data[i + 2] - paletteColor[2], 2)
+                    );
+
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestColor = colorPalette[j];
+                    }
+                }
+
+                // Set the pixel color to the corresponding display color
+                // const newColor = closestColor.original;
+                const newColor = closestColor.display;
+                data[i] = newColor[0];  // red
+                data[i + 1] = newColor[1];  // green
+                data[i + 2] = newColor[2];  // blue
+            }
+
+            return imageData;
+        }
+
         function drawImageWithAdjustments() {
             if (!originalImage) return;
 
@@ -264,11 +310,21 @@
             ctx.drawImage(img, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
 
             // Apply gamma correction
-            let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            applyGammaCorrection(imageData, gamma);
-            ctx.putImageData(imageData, 0, 0);
+            let intermediateImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            applyGammaCorrection(intermediateImageData, gamma);
+            ctx.putImageData(intermediateImageData, 0, 0);
 
             ctx.restore();
+
+            let finalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+
+            // Draw the EPD simulation canvas
+            const epdCanvas = document.getElementById('epd-sim-canvas');
+            const epdCtx = epdCanvas.getContext('2d');
+            // epdCtx.clearRect(0, 0, epdCanvas.width, epdCanvas.height);
+            const quantizedData = quantizeImage(finalImageData, colorPaletteBWR);
+            epdCtx.putImageData(quantizedData, 0, 0);
         }
 
         function downloadImage() {
