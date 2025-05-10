@@ -90,6 +90,7 @@
 
         <input type="file" accept="image/*" id="upload"><br>
         <button onclick="downloadImage()"><i class="fas fa-download icon"></i>Stáhnout upravený obrázek</button>
+        <button onclick="downloadImageEPD()"><i class="fas fa-download icon"></i>Stáhnout podklad pro ePaper vpravo</button>
 
         <div id="resolution-controls">
             <label>Výstupní šířka: <input type="number" id="outputWidth" value="800" min="1"></label>
@@ -150,6 +151,10 @@
         <canvas id="canvas" width="800" height="480"></canvas>
     </div>
 
+    <div style="display:none;">
+        <canvas id="epd-canvas" width="800" height="480"></canvas>
+    </div>
+
     <div class="preview-container">
         <canvas id="epd-sim-canvas" width="800" height="480"></canvas>
     </div>
@@ -157,6 +162,13 @@
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
+
+        const epdCanvas = document.getElementById('epd-canvas');
+        const epdCtx = epdCanvas.getContext('2d');
+
+        const epdSimCanvas = document.getElementById('epd-sim-canvas');
+        const epdSimCtx = epdSimCanvas.getContext('2d');
+
         let originalImage = null;
         let originalFilename = "upraveny_obrazek";
         let outputWidth = 800;
@@ -223,13 +235,18 @@
 
         const colorPaletteBWR = [
             // FIXME just a test
-            { original: [0, 0, 0], display: [10, 10, 10] },  // Black
-            { original: [255, 255, 255], display: [230, 230, 230] }, // White
-            { original: [255, 0, 0], display: [190, 30, 30] }  // Red
+            { original: [0, 0, 0], sim: [10, 10, 10] },  // Black
+            { original: [255, 255, 255], sim: [230, 230, 230] }, // White
+            { original: [255, 0, 0], sim: [190, 30, 30] }  // Red
         ];
 
         function quantizeImage(imageData, colorPalette) {
             const data = imageData.data;
+
+            const imageSimData = new ImageData(imageData.width, imageData.height);
+            imageSimData.data.set(data);
+            const data_sim = imageSimData.data;
+
             const numColors = colorPalette.length;
 
             for (let i = 0; i < data.length; i += 4) {
@@ -253,14 +270,16 @@
                 }
 
                 // Set the pixel color to the corresponding display color
-                // const newColor = closestColor.original;
-                const newColor = closestColor.display;
-                data[i] = newColor[0];  // red
-                data[i + 1] = newColor[1];  // green
-                data[i + 2] = newColor[2];  // blue
+                data[i] = closestColor.original[0];  // red
+                data[i + 1] = closestColor.original[1];  // green
+                data[i + 2] = closestColor.original[2];  // blue
+
+                data_sim[i] = closestColor.sim[0];  // red
+                data_sim[i + 1] = closestColor.sim[1];  // green
+                data_sim[i + 2] = closestColor.sim[2];  // blue
             }
 
-            return imageData;
+            return [imageData, imageSimData];
         }
 
         function drawImageWithAdjustments() {
@@ -320,17 +339,24 @@
 
 
             // Draw the EPD simulation canvas
-            const epdCanvas = document.getElementById('epd-sim-canvas');
-            const epdCtx = epdCanvas.getContext('2d');
             // epdCtx.clearRect(0, 0, epdCanvas.width, epdCanvas.height);
-            const quantizedData = quantizeImage(finalImageData, colorPaletteBWR);
-            epdCtx.putImageData(quantizedData, 0, 0);
+            const quantizedDataArray = quantizeImage(finalImageData, colorPaletteBWR);
+
+            epdCtx.putImageData(quantizedDataArray[0], 0, 0);
+            epdSimCtx.putImageData(quantizedDataArray[1], 0, 0);
         }
 
         function downloadImage() {
             const link = document.createElement('a');
             link.download = `${originalFilename}_upraveno.png`;
             link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        function downloadImageEPD() {
+            const link = document.createElement('a');
+            link.download = `${originalFilename}_upraveno_ePaper.png`;
+            link.href = epdCanvas.toDataURL();
             link.click();
         }
     </script>
