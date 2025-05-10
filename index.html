@@ -115,6 +115,13 @@
                 <span id="saturationValue">1.0</span>
             </div>
             <input type="range" min="0" max="5" step="0.1" value="1" id="saturation">
+
+            <div class="slider-label">
+                <label for="gamma">Gamma:</label>
+                <span id="gammaValue">1.0</span>
+            </div>
+            <input type="range" min="0.1" max="3" step="0.1" value="1" id="gamma">
+
         </div>
 
         <div id="crop-controls">
@@ -175,7 +182,7 @@
             reader.readAsDataURL(file);
         });
 
-        ['brightness', 'contrast', 'saturation'].forEach(id => {
+        ['brightness', 'contrast', 'saturation', 'gamma'].forEach(id => {
             document.getElementById(id).addEventListener('input', () => {
                 document.getElementById(id + "Value").innerText = document.getElementById(id).value;
                 drawImageWithAdjustments();
@@ -200,12 +207,23 @@
             drawImageWithAdjustments();
         }
 
+        function applyGammaCorrection(imageData, gamma) {
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                for (let j = 0; j < 3; j++) { // For R, G, B channels
+                    const value = data[i + j];
+                    data[i + j] = 255 * Math.pow(value / 255, 1 / gamma);
+                }
+            }
+        }
+
         function drawImageWithAdjustments() {
             if (!originalImage) return;
 
             const brightness = parseFloat(document.getElementById('brightness').value);
             const contrast = parseFloat(document.getElementById('contrast').value);
             const saturation = parseFloat(document.getElementById('saturation').value);
+            const gamma = parseFloat(document.getElementById('gamma').value);
             const crop = document.getElementById('cropImage').checked;
 
             ctx.fillStyle = borderColor;
@@ -244,6 +262,12 @@
             ctx.rotate(rotationAngle * Math.PI / 180);
             ctx.translate(-outputWidth / 2, -outputHeight / 2);
             ctx.drawImage(img, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
+
+            // Apply gamma correction
+            let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            applyGammaCorrection(imageData, gamma);
+            ctx.putImageData(imageData, 0, 0);
+
             ctx.restore();
         }
 
