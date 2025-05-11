@@ -95,7 +95,7 @@
 
         <input type="file" accept="image/*" id="upload"><br>
         <button onclick="downloadImage()"><i class="fas fa-download icon"></i>Stáhnout upravený obrázek</button>
-        <button onclick="downloadImageEPD()"><i class="fas fa-download icon"></i>Stáhnout podklad pro ePaper vpravo</button>
+        <button onclick="downloadImageEPD()"><i class="fas fa-download icon"></i>Stáhnout podklad pro ePaper</button>
 
         <div id="resolution-controls">
             <label>Výstupní šířka: <input type="number" id="outputWidth" value="800" min="1"></label>
@@ -115,6 +115,9 @@
                     <option value="floyd-steinberg" selected>Floyd-Steinberg</option>
                 </select>
             </label>
+
+            <input type="checkbox" id="image-adjustments-epd-only" checked onclick="drawImageWithAdjustments()">
+            <label for="image-adjustments-epd-only">Úpravy jasu apod. pouze pro ePaper</label>
         </div>
 
 
@@ -228,12 +231,10 @@
         function resizeCanvas() {
             outputWidth = parseInt(document.getElementById('outputWidth').value);
             outputHeight = parseInt(document.getElementById('outputHeight').value);
-            canvas.width = outputWidth;
-            canvas.height = outputHeight;
-            epdCanvas.width = outputWidth;
-            epdCanvas.height = outputHeight;
-            epdSimCanvas.width = outputWidth;
-            epdSimCanvas.height = outputHeight;
+            (canvas, epdCanvas, epdSimCanvas).forEach(c => {
+                c.width = outputWidth;
+                c.height = outputHeight;
+            });
             drawImageWithAdjustments();
         }
 
@@ -449,6 +450,33 @@
             return imageSimData;
         }
 
+        function applyImageAdjustmentsToContext(img, ctx, brightness = 1, contrast = 1, saturation = 1, gamma = 1) {
+            ctx.save();
+
+            ctx.filter = `brightness(${brightness}) contrast(${contrast}) saturate(${saturation})`;
+            ctx.drawImage(img, 0, 0);
+            const imageData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
+            ctx.restore();
+
+            applyGammaCorrection(imageData, gamma);
+            ctx.putImageData(imageData, 0, 0);
+        }
+
+        function copyImageToTempContextAndApplyAdjustmentsIf(condition, source, brightness, contrast, saturation, gamma) {
+            const tmpCanvas = document.createElement('canvas');
+            tmpCanvas.width = source.width;
+            tmpCanvas.height = source.height;
+            const tmpCtx = tmpCanvas.getContext('2d', { willReadFrequently: true });
+
+            tmpCtx.clearRect(0, 0, tmpCanvas.width, tmpCanvas.height);
+            if (condition) {
+                applyImageAdjustmentsToContext(source, tmpCtx, brightness, contrast, saturation, gamma);
+            } else {
+                tmpCtx.drawImage(source, 0, 0);
+            }
+
+            return tmpCtx;
+        }
 
         function drawImageWithAdjustments() {
             if (!originalImage) return;
@@ -459,11 +487,11 @@
             const gamma = parseFloat(document.getElementById('gamma').value);
             const ditheringMethod = document.getElementById('ditheringMethod').value;
             const crop = document.getElementById('cropImage').checked;
-
-            ctx.fillStyle = borderColor;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            const imageAdjustmentsEpdOnly = document.getElementById('image-adjustments-epd-only').checked;
 
             const img = originalImage;
+            const tmpCtx1 = copyImageToTempContextAndApplyAdjustmentsIf(!imageAdjustmentsEpdOnly, img, brightness, contrast, saturation, gamma);
+
             let sx = 0, sy = 0, sWidth = img.width, sHeight = img.height;
             let dx = 0, dy = 0, dWidth = outputWidth, dHeight = outputHeight;
 
@@ -485,30 +513,23 @@
                 dx = (outputWidth - dWidth) / 2;
                 dy = (outputHeight - dHeight) / 2;
             }
-
+            
+            ctx.fillStyle = borderColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.save();
-            ctx.filter = `
-        brightness(${brightness})
-        contrast(${contrast})
-        saturate(${saturation})
-      `;
+
             ctx.translate(outputWidth / 2, outputHeight / 2);
             ctx.rotate(rotationAngle * Math.PI / 180);
             ctx.translate(-outputWidth / 2, -outputHeight / 2);
-            ctx.drawImage(img, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
-
-            // Apply gamma correction
-            let intermediateImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            applyGammaCorrection(intermediateImageData, gamma);
-            ctx.putImageData(intermediateImageData, 0, 0);
+            ctx.drawImage(tmpCtx1.canvas, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
 
             ctx.restore();
 
-            let finalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const tmpCtx2 = copyImageToTempContextAndApplyAdjustmentsIf(imageAdjustmentsEpdOnly, ctx.canvas, brightness, contrast, saturation, gamma);
 
+            // Color quantization and dithering
+            let finalImageData = tmpCtx2.getImageData(0, 0, tmpCtx2.canvas.width, tmpCtx2.canvas.height);
 
-            // Draw the EPD simulation canvas
-            // epdCtx.clearRect(0, 0, epdCanvas.width, epdCanvas.height);
             const select = document.getElementById('epd-palette');
             const selectedPaletteCode = select.options[select.selectedIndex].value;
 
@@ -519,9 +540,10 @@
                 // No dithering
                 palettedImage = simplePosterization(finalImageData, colorPalettes[selectedPaletteCode]);
             }
-
+            epdCtx.clearRect(0, 0, epdCtx.canvas.width, epdCtx.canvas.height);
             epdCtx.putImageData(palettedImage, 0, 0);
 
+            // Draw the EPD simulation canvas with real-like colors
             epdSimCtx.putImageData(simulatedImage(palettedImage, colorPalettes[selectedPaletteCode]), 0, 0);
         }
 
