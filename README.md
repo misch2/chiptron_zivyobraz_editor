@@ -9,8 +9,10 @@ Author: @chiptronCZ on x.com
 #### Modifications:
 
 - Added gamma correction
-- Added EPD simulation
-- Download of the posterized image
+- Added EPD colors simulation
+- Added dithering with Floyd-Steinberg algorithm
+- Added an option to view EPD color adjustments only (to compare with the original image)
+- Download of the posterized/dithered image
 
 
 
