@@ -257,36 +257,65 @@
             }
         }
 
+        const colorShortcuts = {
+            "black": { origHex: '#000000', simHex: '#282828' },
+            "yellow": { origHex: '#ffff00', simHex: '#f8b000' },
+            "red": { origHex: '#ff0000', simHex: '#a03030' },
+            "white": { origHex: '#ffffff', simHex: '#e8e8e8' },
+            "blue": { origHex: '#0000ff', simHex: '#5098f0' },
+            "green": { origHex: '#00ff00', simHex: '#70a860' },
+        }
+
+        function hexToRgb(hex) {
+            // Remove the '#' character if it's present
+            hex = hex.replace(/^#/, '');
+
+            // Parse the hex string into RGB components
+            const r = parseInt(hex.substring(0, 2), 16); // Red
+            const g = parseInt(hex.substring(2, 4), 16); // Green
+            const b = parseInt(hex.substring(4, 6), 16); // Blue
+
+            // Return the RGB array
+            return [r, g, b];
+        }
+
         const colorPalettes = {
             "2 - BW (černobílý)": [
-                { original: [0, 0, 0], sim: [0, 0, 0] }, // Black
-                { original: [255, 255, 255], sim: [230, 230, 230] } // White
+                colorShortcuts.black,
+                colorShortcuts.white
             ],
             "3 - BWR (černo-bílo-červený)": [
-                { original: [0, 0, 0], sim: [10, 10, 10] },  // Black
-                { original: [255, 255, 255], sim: [230, 230, 230] }, // White
-                { original: [255, 0, 0], sim: [190, 30, 30] }  // Red
+                colorShortcuts.black,
+                colorShortcuts.white,
+                colorShortcuts.red
             ],
             "3 - BWY (černo-bílo-žlutý)": [
-                { original: [0, 0, 0], sim: [10, 10, 10] },  // Black
-                { original: [255, 255, 255], sim: [230, 230, 230] }, // White
-                { original: [255, 255, 0], sim: [230, 200, 30] } // Yellow
+                colorShortcuts.black,
+                colorShortcuts.white,
+                colorShortcuts.yellow
             ],
             "4 - BWRY (černo-bílo-červeno-žlutý)": [
-                { original: [0, 0, 0], sim: [10, 10, 10] },  // Black
-                { original: [255, 255, 255], sim: [230, 230, 230] }, // White
-                { original: [255, 0, 0], sim: [190, 30, 30] },  // Red
-                { original: [255, 255, 0], sim: [230, 200, 30] } // Yellow
+                colorShortcuts.black,
+                colorShortcuts.white,
+                colorShortcuts.red,
+                colorShortcuts.yellow
             ],
-            "7 - BWRYGBO (černo-bílo-červeno-žluto-zeleno-modro-oranžový)": [
-                { original: [0, 0, 0], sim: [10, 10, 10] },  // Black
-                { original: [255, 255, 255], sim: [230, 230, 230] }, // White
-                { original: [255, 0, 0], sim: [190, 30, 30] },  // Red
-                { original: [255, 255, 0], sim: [230, 200, 30] }, // Yellow
-                { original: [0, 255, 0], sim: [30, 190, 30] }, // Green
-                { original: [0, 0, 255], sim: [30, 30, 190] }, // Blue
-                { original: [255, 165, 0], sim: [230, 130, 30] } // Orange
+            "6 - BWRYGB (černo-bílo-červeno-žluto-zeleno-modrý)": [
+                colorShortcuts.black,
+                colorShortcuts.white,
+                colorShortcuts.red,
+                colorShortcuts.yellow,
+                colorShortcuts.green,
+                colorShortcuts.blue,
             ]
+        }
+
+        function generateColorShortcutsRGB() {
+            Object.keys(colorShortcuts).forEach(key => {
+                let color = colorShortcuts[key];
+                color.orig = hexToRgb(color.origHex);
+                color.sim = hexToRgb(color.simHex);
+            })
         }
 
         function generateColorPaletteSelection() {
@@ -303,7 +332,7 @@
             let closestColor = colorPalette[0];
 
             colorPalette.forEach(color => {
-                if (color.original[0] === rgb[0] && color.original[1] === rgb[1] && color.original[2] === rgb[2]) {
+                if (color.orig[0] === rgb[0] && color.orig[1] === rgb[1] && color.orig[2] === rgb[2]) {
                     closestColor = color;
                     return;
                 }
@@ -318,9 +347,9 @@
 
             colorPalette.forEach(color => {
                 const distance = Math.sqrt(
-                    Math.pow(rgb[0] - color.original[0], 2) +
-                    Math.pow(rgb[1] - color.original[1], 2) +
-                    Math.pow(rgb[2] - color.original[2], 2)
+                    Math.pow(rgb[0] - color.orig[0], 2) +
+                    Math.pow(rgb[1] - color.orig[1], 2) +
+                    Math.pow(rgb[2] - color.orig[2], 2)
                 );
 
                 if (distance < minDistance) {
@@ -340,9 +369,9 @@
                 let color = findClosestColor(data.slice(i, i + 3), colorPalette);
 
                 // Set the pixel color to the corresponding display color
-                data[i] = color.original[0];  // red
-                data[i + 1] = color.original[1];  // green
-                data[i + 2] = color.original[2];  // blue
+                data[i] = color.orig[0];  // red
+                data[i + 1] = color.orig[1];  // green
+                data[i + 2] = color.orig[2];  // blue
             }
 
             return imageData;
@@ -362,7 +391,7 @@
 
                     // Find the closest color in the palette
                     const closestColor = findClosestColor([r, g, b], colorPalette);
-                    const newColor = closestColor.original;
+                    const newColor = closestColor.orig;
 
                     // Set the new color
                     data[index] = newColor[0];
@@ -511,6 +540,7 @@
         }
 
         window.onload = function () {
+            generateColorShortcutsRGB();
             generateColorPaletteSelection();
         };
 
