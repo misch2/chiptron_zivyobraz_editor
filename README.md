@@ -1,4 +1,4 @@
-⚠️Now integrated directly into the https://github.com/petus/ZivyObraz_image_editor/
+# Now integrated directly into the https://github.com/petus/ZivyObraz_image_editor/
 
 ---
 
