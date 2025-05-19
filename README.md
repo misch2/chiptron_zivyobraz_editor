@@ -1,3 +1,7 @@
+⚠️Now integrated directly into the https://github.com/petus/ZivyObraz_image_editor/
+
+---
+
 Inspired by [this @chiptron great idea](https://x.com/chiptronCZ/status/1920553957169995872) 
 
 ## Original
